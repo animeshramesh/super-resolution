@@ -14,6 +14,8 @@ from scipy.ndimage.filters import gaussian_filter
 import tqdm
 import time
 
+import img_utils
+
 # Paths
 DATASET_DIR = '/Users/admin/Downloads/images_all/'
 TARGET_DIR = '/Users/admin/Dev/super-resolution/dataset/'
@@ -33,14 +35,6 @@ if not os.path.exists(os.path.join(TARGET_DIR, 'Y')):
 if not os.path.exists(os.path.join(TARGET_DIR, 'X')):
     os.makedirs(os.path.join(TARGET_DIR, 'X'))
 
-def subimage_generator(img, stride, patch_size, nb_hr_images):
-    for _ in range(nb_hr_images):
-        for x in range(0, IMG_SHAPE - patch_size, stride):
-            for y in range(0, IMG_SHAPE - patch_size, stride):
-                subimage = img[x : x + patch_size, y : y + patch_size, :]
-
-                yield subimage
-
 for index, img_file in enumerate(os.listdir(DATASET_DIR)):
     img = imread(os.path.join(DATASET_DIR, img_file), mode='RGB')
 
@@ -50,7 +44,7 @@ for index, img_file in enumerate(os.listdir(DATASET_DIR)):
      # Create patches
     nb_hr_images = (IMG_SHAPE ** 2) // (STRIDE ** 2)    # Flooring division
     hr_samples = np.empty((nb_hr_images, HR_PATCH_SIZE, HR_PATCH_SIZE, 3))
-    image_subsample_iterator = subimage_generator(img, STRIDE, HR_PATCH_SIZE, nb_hr_images)
+    image_subsample_iterator = img_utils.subimage_generator(img, STRIDE, HR_PATCH_SIZE, nb_hr_images)
 
     stride_range = np.sqrt(nb_hr_images).astype(int)
 
@@ -74,7 +68,12 @@ for index, img_file in enumerate(os.listdir(DATASET_DIR)):
         # Subsample by scaling factor to create X
         op = imresize(op, (LR_PATCH_SIZE, LR_PATCH_SIZE), interp='bicubic')
 
+        # Ensure that size of X = size of Y
+        op = imresize(op, (HR_PATCH_SIZE, HR_PATCH_SIZE), interp='bicubic')
+
         # Save X
         imsave(TARGET_DIR + "/X/" + "%d_%d.png" % (index + 1, i+1), op)
 
     print("Finished image %d in time %0.2f seconds.. " % (index + 1, time.time() - t1))
+    if index + 1 >= 50:
+        break
